@@ -1,6 +1,8 @@
 # DermaOps Setup & Installation Guide
 
-Welcome to **DermaOps**! This guide will walk you through setting up the project locally from scratch. Since large files like datasets and trained models are not stored in the Git repository, you will need to generate them using the provided pipelines.
+Welcome to **DermaOps**! This guide will walk you through setting up the project locally.
+
+**Good News:** The processed dataset and the trained model are included in this repository (via Git LFS), so you can run the application immediately without needing to retrain!
 
 ---
 
@@ -10,8 +12,8 @@ Before you begin, ensure you have the following installed on your system:
 
 1.  **Python 3.10+**: [Download Python](https://www.python.org/downloads/)
 2.  **Git**: [Download Git](https://git-scm.com/downloads)
-3.  **Docker Desktop** (Optional, for containerized deployment): [Download Docker](https://www.docker.com/products/docker-desktop/)
-4.  **NVIDIA GPU Drivers** (Optional, but highly recommended for training): If you have an NVIDIA GPU, ensure you have the latest drivers and CUDA toolkit installed.
+3.  **Git LFS**: Required to download the model file. [Download Git LFS](https://git-lfs.com/)
+4.  **Docker Desktop** (Optional, for containerized deployment): [Download Docker](https://www.docker.com/products/docker-desktop/)
 
 ---
 
@@ -22,8 +24,15 @@ Before you begin, ensure you have the following installed on your system:
 Open your terminal or command prompt and run:
 
 ```bash
+# Install Git LFS first if you haven't
+git lfs install
+
+# Clone the repo
 git clone https://github.com/Mibrahim2003/Skin-Cancer-Detection.git
 cd Skin-Cancer-Detection
+
+# Pull the large model file
+git lfs pull
 ```
 
 ### 2. Set Up a Virtual Environment
@@ -54,46 +63,26 @@ pip install -r requirements.txt
 
 ## 📦 Data & Model Setup
 
-Since the dataset (HAM10000) and the trained model (`best_model_resnet.pth`) are too large for GitHub, you need to run the automated pipeline to download the data and train the model locally.
+The repository comes pre-packaged with:
+-   **Processed Data**: `data/processed/` (Train/Val/Test splits ready for use)
+-   **Trained Model**: `models/best_model_resnet.pth` (ResNet50 fine-tuned)
 
-### Option A: Run the Full Automated Pipeline (Recommended)
+**You do NOT need to run the training pipeline to start the app.**
 
-We use **Prefect** to orchestrate the entire process. This single command will:
-1.  Download the HAM10000 dataset from Kaggle.
-2.  Preprocess the images (resize, normalize, split).
-3.  Train the ResNet50 model (this may take 30-60 mins depending on your GPU).
-4.  Evaluate the model and save the best checkpoint.
+### (Optional) Retraining from Scratch
 
-Run the following command:
+Only run this if you want to reproduce the training process or download the raw HAM10000 dataset from Kaggle:
 
 ```bash
+# This will download raw data, preprocess it, and retrain the model
 python -m src.pipelines.orchestration
 ```
-
-*Note: The first time you run this, it will download ~3GB of data. Ensure you have a stable internet connection.*
-
-### Option B: Manual Steps (Advanced)
-
-If you prefer to run steps individually:
-
-1.  **Download Data**:
-    ```bash
-    python -m src.pipelines.orchestration --stage ingest
-    ```
-2.  **Preprocess Data**:
-    ```bash
-    python -m src.pipelines.orchestration --stage preprocess
-    ```
-3.  **Train Model**:
-    ```bash
-    python -m src.pipelines.orchestration --stage train
-    ```
 
 ---
 
 ## 🖥️ Running the Application
 
-Once the pipeline completes and you see `models/best_model_resnet.pth`, you are ready to launch the app.
+You are ready to launch the app immediately.
 
 ### Method 1: Using Docker (Easiest)
 
