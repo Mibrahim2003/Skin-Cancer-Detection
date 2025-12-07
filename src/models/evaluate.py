@@ -482,7 +482,8 @@ def generate_gradcam_samples(
 def run_evaluation(
     model_path: str = "models/best_model_resnet.pth",
     data_dir: str = "data/processed",
-    output_dir: str = "reports"
+    output_dir: str = "reports",
+    num_workers: int = 2
 ):
     """
     Run complete evaluation pipeline.
@@ -491,6 +492,7 @@ def run_evaluation(
         model_path: Path to saved model.
         data_dir: Directory containing test data.
         output_dir: Directory for outputs.
+        num_workers: Number of data loading workers (use 0 for Prefect).
     """
     print("="*60)
     print("DERMAOPS MODEL EVALUATION")
@@ -503,7 +505,7 @@ def run_evaluation(
     model = load_model(model_path, device)
     
     # Load test data
-    test_loader, test_dataset = get_test_dataloader(data_dir)
+    test_loader, test_dataset = get_test_dataloader(data_dir, num_workers=num_workers)
     
     # Run inference
     y_pred, y_true, y_probs = run_inference(model, test_loader, device)

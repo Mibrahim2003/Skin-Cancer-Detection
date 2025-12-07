@@ -180,4 +180,111 @@ Grad-CAM visualizations show where the model focuses when classifying Melanoma s
 
 ---
 
+## 5. Orchestration & Reliability (Prefect Pipeline)
+
+### Pipeline Architecture
+
+The DermaOps ML pipeline is orchestrated using **Prefect 3.x**, providing automated execution, failure recovery, and monitoring.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DermaOps-ML-Pipeline                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌───────────────┐    ┌───────────────┐    ┌───────────────┐
+│ ingest_data   │ →  │ preprocess_   │ →  │ train_model   │
+│   (Task)      │    │    data       │    │   (Task)      │
+│               │    │   (Task)      │    │               │
+│ retries: 3    │    │ retries: 1    │    │ retries: 1    │
+│ backoff: exp  │    │               │    │               │
+└───────────────┘    └───────────────┘    └───────────────┘
+                                                  │
+                    ┌─────────────────────────────┤
+                    ▼                             ▼
+           ┌───────────────┐             ┌───────────────┐
+           │ evaluate_     │             │ send_         │
+           │    model      │ ─────────→  │ notification  │
+           │   (Task)      │             │   (Task)      │
+           │ retries: 1    │             │               │
+           └───────────────┘             └───────────────┘
+```
+
+### Failure Handling & Retry Strategy
+
+| Task | Retries | Backoff | Rationale |
+|------|---------|---------|-----------|
+| `ingest_data` | 3 | [30s, 60s, 120s] | Network failures during Kaggle download are transient |
+| `preprocess_data` | 1 | 60s | Disk/memory issues; retry once before failing |
+| `train_model` | 1 | 60s | GPU OOM or CUDA errors may recover after memory release |
+| `evaluate_model` | 1 | - | Quick task, one retry sufficient |
+
+### Smart Checkpointing
+
+The pipeline implements **idempotent execution** - it skips already-completed stages:
+
+```python
+# Example: Ingestion task checks for existing data
+if not force_download and data_path.exists():
+    if verify_dataset(target_dir):
+        return {"status": "skipped", "message": "Data already present"}
+```
+
+**Benefits:**
+- ✅ Re-running the pipeline skips completed stages
+- ✅ Failures resume from the failed stage, not the beginning
+- ✅ `--force-*` flags allow explicit re-execution when needed
+
+### Notification System
+
+Upon pipeline completion (success or failure), the pipeline:
+
+1. **Creates a Prefect Artifact** (visible in Prefect UI)
+2. **Saves a local markdown report** to `reports/pipeline_notification.md`
+3. **Logs detailed summary** to console
+
+**Success Notification Example:**
+```markdown
+# ✅ DermaOps Pipeline Completed Successfully
+
+## Training Results
+- Best F1 Score: 0.7784
+- Training Duration: 45.2 minutes
+
+## Test Set Performance
+- Accuracy: 0.7285
+- F1 Score (Weighted): 0.7486
+```
+
+### CLI Usage
+
+```bash
+# Run full pipeline (skips existing data/models)
+python -m src.pipelines.orchestration
+
+# Force retraining from scratch
+python -m src.pipelines.orchestration --force-retrain
+
+# Run specific stages
+python -m src.pipelines.orchestration --stage ingest
+python -m src.pipelines.orchestration --stage preprocess
+python -m src.pipelines.orchestration --stage train
+python -m src.pipelines.orchestration --stage evaluate
+
+# Customize training
+python -m src.pipelines.orchestration --epochs 20 --finetune-epochs 10 --batch-size 64
+```
+
+### Tested Scenarios
+
+| Scenario | Result |
+|----------|--------|
+| Full pipeline with existing data | ✅ Skipped download, ran preprocessing |
+| Evaluation only | ✅ Loaded model, generated metrics |
+| Network disconnect during download | ✅ Retried 3x with exponential backoff |
+| Force retrain | ✅ Overwrote existing model |
+
+---
+
 *Report content will continue as the project progresses.*
