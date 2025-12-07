@@ -287,4 +287,81 @@ python -m src.pipelines.orchestration --epochs 20 --finetune-epochs 10 --batch-s
 
 ---
 
+## 6. Reliability Improvements via Prefect Orchestration
+
+### Automated Workflow
+
+We replaced manual script execution with a **Prefect Flow**, which links Data Ingestion, Preprocessing, Training, and Evaluation into a single directed acyclic graph (DAG). This provides:
+
+- **Dependency Management**: Tasks execute in the correct order automatically
+- **State Tracking**: Each task's status is recorded and visible in the Prefect UI
+- **Idempotent Execution**: Pipeline skips completed stages on re-runs
+- **Centralized Monitoring**: All flow runs visible at `http://localhost:4200`
+
+### Error Handling & Resilience
+
+#### Retry Logic
+
+During testing, we observed that network issues can occur when downloading from the Kaggle API. We implemented a `retries=3` policy with `retry_delay_seconds=60` on the Data Ingestion Task. This allows the pipeline to automatically recover from network drops without human intervention.
+
+**Demonstrated Retry Behavior:**
+```
+20:14:27 | Task run 'flaky_download_task' - 🔄 Download attempt 1/3...
+20:14:27 | Task run 'flaky_download_task' - ❌ Simulated network failure on attempt 1
+20:14:27 | Task run 'flaky_download_task' - Retry 1/3 will start 5 second(s) from now
+20:14:32 | Task run 'flaky_download_task' - 🔄 Download attempt 2/3...
+20:14:32 | Task run 'flaky_download_task' - ❌ Simulated network failure on attempt 2
+20:14:32 | Task run 'flaky_download_task' - Retry 2/3 will start 5 second(s) from now
+20:14:37 | Task run 'flaky_download_task' - 🔄 Download attempt 3/3...
+20:14:37 | Task run 'flaky_download_task' - ✅ Download succeeded on attempt 3!
+```
+
+#### Sanity Check
+
+The training task includes a sanity check that fails the pipeline if accuracy falls below 60%, preventing deployment of broken models:
+
+```python
+if final_accuracy < min_accuracy:
+    raise ValueError(f"Training failed sanity check! Accuracy {final_accuracy:.2%} < {min_accuracy:.2%}")
+```
+
+#### Notifications
+
+The system is integrated with **Discord Webhooks**. Upon pipeline completion, it sends a summary of the training metrics (F1-score, accuracy). If a failure occurs (e.g., GPU OOM, network timeout), an alert is sent immediately.
+
+**Notification Examples:**
+
+| Event | Alert Type | Message |
+|-------|------------|---------|
+| Pipeline Success | ✅ SUCCESS | "Pipeline Finished Successfully! 🚀 Test F1: 0.7486" |
+| Pipeline Failure | ❌ FAILURE | "Pipeline Failed: CUDA out of memory. Failed Stage: Training" |
+| Network Retry | ⚠️ WARNING | "Retrying data download (attempt 2/3)" |
+
+**Sample Success Notification:**
+```
+📢 Discord alert:
+   ✅ SUCCESS: Pipeline completed successfully! 🎉
+   • F1 Score: 0.7486
+   • Accuracy: 0.7285
+   • Duration: 0.4 min
+```
+
+### Visual Proof: Prefect Dashboard
+
+The Prefect UI at `http://localhost:4200` shows all flow runs with their status:
+
+```
+                                        Flow Runs                                        
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
+┃ ID                         ┃ Flow                      ┃ Name           ┃ Status  ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
+│ 7cd3e435-8a45-4cf2-b40b... │ DermaOps End-to-End P... │ efficient-lab. │ ✅ COMP │
+│ eddb2bb4-3299-40cd-a6a1... │ DermaOps End-to-End P... │ prudent-goose  │ ✅ COMP │
+│ fd6ba27d-6d7b-47f9-ab78... │ DermaOps End-to-End P... │ rational-crab  │ ✅ COMP │
+│ 158b7b62-5a64-4a52-a8cc... │ Retry-Demo-Flow           │ pretty-labrad. │ ✅ COMP │
+└────────────────────────────┴───────────────────────────┴────────────────┴─────────┘
+```
+
+---
+
 *Report content will continue as the project progresses.*
