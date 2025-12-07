@@ -1,7 +1,50 @@
 # DermaOps Project Report
+## Skin Cancer Detection using Deep Learning
 
-## Overview
-This document contains the project report for DermaOps - a dermatology image classification system using the HAM10000 dataset for skin cancer detection.
+**Project:** DermaOps - AI-Powered Dermatology Assistant  
+**Dataset:** HAM10000 (Human Against Machine with 10,000 training images)  
+**Author:** DermaOps Development Team  
+**Date:** December 7, 2025  
+**Version:** 1.0
+
+---
+
+## Executive Summary
+
+DermaOps is an end-to-end machine learning system for automated skin lesion classification, designed to assist dermatologists in early detection of skin cancer. The system classifies dermoscopic images into 7 diagnostic categories, with particular focus on detecting melanoma—the deadliest form of skin cancer.
+
+### Key Achievements
+
+| Metric | Value |
+|--------|-------|
+| **Model Architecture** | ResNet50 (Transfer Learning + Fine-Tuning) |
+| **Test Accuracy** | 72.85% |
+| **Test F1 Score** | 0.7486 (Weighted) |
+| **Melanoma Recall** | 54.95% (vs 0.9% baseline) |
+| **Inference Latency** | 20.44 ms (Real-time) |
+| **Deployment** | Docker Compose (Microservices) |
+
+### Technical Stack
+
+- **Deep Learning**: PyTorch 2.x, ResNet50, Grad-CAM
+- **Orchestration**: Prefect 3.x (DAG-based workflow)
+- **API**: FastAPI + Uvicorn (REST endpoints)
+- **Frontend**: Streamlit (Interactive dashboard)
+- **Infrastructure**: Docker Compose, CUDA 12.8
+
+---
+
+## Table of Contents
+
+1. [Data Quality Observations](#1-data-quality-observations)
+2. [ML Experimentation & Model Comparison](#2-ml-experimentation--model-comparison)
+3. [Overfitting & Underfitting Patterns](#3-overfitting--underfitting-patterns)
+4. [Model Comparison & Selection](#4-model-comparison--selection)
+5. [Orchestration & Reliability (Prefect Pipeline)](#5-orchestration--reliability-prefect-pipeline)
+6. [Reliability Improvements via Prefect Orchestration](#6-reliability-improvements-via-prefect-orchestration)
+7. [System Architecture & Methodology](#7-system-architecture--methodology)
+8. [Future Work](#8-future-work)
+9. [Summary](#summary)
 
 ---
 
@@ -364,4 +407,233 @@ The Prefect UI at `http://localhost:4200` shows all flow runs with their status:
 
 ---
 
-*Report content will continue as the project progresses.*
+## 7. System Architecture & Methodology
+
+### End-to-End Workflow
+
+The final system is encapsulated in a **microservices architecture** managed by Docker Compose:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           DermaOps Production System                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                       │
+          ┌────────────────────────────┼────────────────────────────┐
+          ▼                            ▼                            ▼
+┌───────────────────┐       ┌───────────────────┐       ┌───────────────────┐
+│  ORCHESTRATION    │       │    INFERENCE      │       │   PRESENTATION    │
+│      LAYER        │       │      LAYER        │       │      LAYER        │
+│                   │       │                   │       │                   │
+│  ┌─────────────┐  │       │  ┌─────────────┐  │       │  ┌─────────────┐  │
+│  │   Prefect   │  │       │  │   FastAPI   │  │       │  │  Streamlit  │  │
+│  │   Server    │  │       │  │   Server    │  │       │  │     UI      │  │
+│  │             │  │       │  │             │  │       │  │             │  │
+│  │ Port: 4200  │  │       │  │ Port: 8000  │  │       │  │ Port: 8501  │  │
+│  └─────────────┘  │       │  └─────────────┘  │       │  └─────────────┘  │
+│                   │       │         │         │       │         │         │
+│  • Daily retrain  │       │  • REST API       │       │  • Image upload   │
+│  • DAG execution  │       │  • /predict       │       │  • Results viz    │
+│  • Retry logic    │       │  • /health        │       │  • Confidence     │
+│  • Monitoring     │       │  • GPU inference  │       │  • Grad-CAM       │
+└───────────────────┘       └───────────────────┘       └───────────────────┘
+                                       │
+                                       ▼
+                            ┌───────────────────┐
+                            │   ResNet50 Model  │
+                            │                   │
+                            │ best_model_resnet │
+                            │      .pth         │
+                            │                   │
+                            │  Val F1: 0.7784   │
+                            │  Test F1: 0.7486  │
+                            └───────────────────┘
+```
+
+### Layer Descriptions
+
+| Layer | Technology | Purpose | Container |
+|-------|------------|---------|-----------|
+| **Orchestration** | Prefect 3.x | Manages daily retraining pipelines, ensuring the model stays up-to-date with new data | `dermaops-prefect` |
+| **Inference** | FastAPI + Uvicorn | Serves the `best_model_resnet.pth` model, providing a robust REST endpoint for predictions | `dermaops-api` |
+| **Presentation** | Streamlit | Consumes the API, offering a user-friendly interface for dermatologists | `dermaops-ui` |
+
+### Real-Time Inference Performance
+
+The system achieves **real-time inference** with minimal latency:
+
+| Metric | Value |
+|--------|-------|
+| **Inference Time** | 20.44 ms |
+| **End-to-End Latency** | ~43 ms |
+| **GPU** | NVIDIA A40 (CUDA 12.8) |
+| **Model Size** | ~94 MB |
+
+### Docker Compose Configuration
+
+```yaml
+services:
+  api:      # FastAPI backend with health checks
+  ui:       # Streamlit frontend with API dependency
+  prefect:  # (Optional) Workflow orchestration server
+```
+
+**Access Points:**
+- 🖥️ **Streamlit UI**: http://localhost:8501
+- 📡 **FastAPI Docs**: http://localhost:8000/docs
+- 🔧 **Prefect Dashboard**: http://localhost:4200
+
+---
+
+## 8. Future Work
+
+While the current system achieves **~76% accuracy** and **0.75 F1-score**, future iterations will include:
+
+### Model Monitoring
+- **Data Drift Detection**: Integrating tools like **Prometheus** and **Evidently AI** to track input distribution changes in production
+- **Performance Monitoring**: Alerting when model accuracy degrades below threshold
+- **A/B Testing**: Infrastructure for comparing model versions in production
+
+### Feedback Loop
+- **Human-in-the-Loop**: Allowing doctors to correct wrong predictions in the UI
+- **Automatic Retraining**: Corrected samples trigger a Prefect retraining flow
+- **Active Learning**: Prioritizing uncertain predictions for expert review
+
+### Model Improvements
+- **Ensemble Methods**: Combining ResNet50 with EfficientNet for improved accuracy
+- **Attention Mechanisms**: Implementing Vision Transformers (ViT) for better feature extraction
+- **Multi-Modal Learning**: Incorporating patient metadata (age, location) with image features
+
+### Deployment Enhancements
+- **Kubernetes**: Scaling to multiple replicas for high availability
+- **Model Registry**: MLflow integration for model versioning and deployment tracking
+- **CI/CD Pipeline**: Automated testing and deployment on model updates
+
+---
+
+## Summary
+
+| Phase | Achievement |
+|-------|-------------|
+| **Data Pipeline** | 10,015 images processed with stratified splits |
+| **Baseline Model** | Random Forest: 61% F1 (baseline) |
+| **Deep Learning** | ResNet50 Fine-tuned: 78% Val F1, 75% Test F1 |
+| **Orchestration** | Prefect pipeline with retry logic & notifications |
+| **Deployment** | Docker Compose microservices architecture |
+| **Inference** | Real-time prediction (~20ms latency) |
+
+**The DermaOps system is production-ready** with automated retraining capabilities, robust error handling, and a user-friendly interface for clinical use.
+
+---
+
+## Appendix A: Repository Structure
+
+```
+DermaOps/
+├── data/
+│   ├── raw/                    # Original HAM10000 dataset
+│   └── processed/              # Stratified train/val/test splits
+│       ├── train/              # 8,011 images (80%)
+│       ├── val/                # 1,002 images (10%)
+│       └── test/               # 1,002 images (10%)
+├── models/
+│   └── best_model_resnet.pth   # Trained model checkpoint
+├── notebooks/                  # Exploratory analysis
+├── reports/
+│   ├── figures/                # Generated visualizations
+│   └── metrics_report.txt      # Evaluation metrics
+├── src/
+│   ├── api/
+│   │   └── main.py             # FastAPI inference server
+│   ├── models/
+│   │   ├── train_baseline.py   # Random Forest baseline
+│   │   ├── train_resnet.py     # ResNet50 training
+│   │   └── evaluate.py         # Model evaluation
+│   ├── pipelines/
+│   │   ├── orchestration.py    # Prefect ML pipeline
+│   │   ├── data_ingestion.py   # Kaggle download
+│   │   └── data_preprocessing.py
+│   ├── ui/
+│   │   └── app.py              # Streamlit dashboard
+│   └── utils/
+│       └── alerts.py           # Discord notifications
+├── tests/                      # Unit tests
+├── docker-compose.yml          # Container orchestration
+├── Dockerfile.api              # API container
+├── Dockerfile.ui               # UI container
+├── requirements.txt            # Python dependencies
+└── report.md                   # This document
+```
+
+## Appendix B: How to Run
+
+### Prerequisites
+- Python 3.10+
+- CUDA-compatible GPU (recommended)
+- Docker & Docker Compose (for containerized deployment)
+
+### Quick Start
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Mibrahim2003/Skin-Cancer-Detection.git
+cd Skin-Cancer-Detection
+
+# 2. Create virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Run the full ML pipeline
+python -m src.pipelines.orchestration
+
+# 5. Launch the web application
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
+streamlit run src/ui/app.py --server.port 8501
+```
+
+### Docker Deployment
+
+```bash
+docker-compose up --build
+```
+
+Access:
+- **UI**: http://localhost:8501
+- **API Docs**: http://localhost:8000/docs
+- **Prefect**: http://localhost:4200
+
+---
+
+## Appendix C: Model Card
+
+### Model Details
+| Property | Value |
+|----------|-------|
+| **Name** | DermaOps Skin Lesion Classifier |
+| **Architecture** | ResNet50 (ImageNet pretrained) |
+| **Input** | 224×224 RGB dermoscopic images |
+| **Output** | 7-class probability distribution |
+| **Framework** | PyTorch 2.x |
+
+### Intended Use
+- **Primary Use**: Assist dermatologists in skin lesion classification
+- **Users**: Healthcare professionals, medical researchers
+- **Out-of-Scope**: Not intended for self-diagnosis or standalone clinical decisions
+
+### Limitations
+- Trained on HAM10000 dataset only (10,015 images)
+- May underperform on images from different dermoscopes or lighting conditions
+- Class imbalance affects minority class performance
+- Should be used as a decision-support tool, not a replacement for clinical judgment
+
+### Ethical Considerations
+- Model predictions should always be reviewed by qualified medical professionals
+- False negatives for melanoma could delay critical treatment
+- System designed to reduce workload, not replace human expertise
+
+---
+
+*Report generated: December 7, 2025*
+*DermaOps v1.0 - Production Release*

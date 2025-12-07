@@ -81,10 +81,10 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
-# Model files (too large for git)
+# Model files (Handled by Git LFS)
 models/*.h5
 models/*.pt
-models/*.pth
+# models/*.pth  <-- Un-commented to allow upload via LFS
 models/*.onnx
 !models/.gitkeep
 
@@ -99,3 +99,12 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# DermaOps Specific
+data/
+!data/.gitkeep
+models/*.pth
+!models/.gitkeep
+venv/
+.env
+.DS_Store
