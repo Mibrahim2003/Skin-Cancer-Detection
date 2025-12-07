@@ -1,0 +1,90 @@
+# DermaOps Docker Compose
+# Launch the complete ML application stack with one command
+#
+# Usage:
+#   docker-compose up --build     # Build and start all services
+#   docker-compose up -d          # Start in detached mode
+#   docker-compose down           # Stop all services
+#   docker-compose logs -f        # View logs
+#
+# Access:
+#   - Streamlit UI: http://localhost:8501
+#   - FastAPI Docs: http://localhost:8000/docs
+#   - API Health:   http://localhost:8000/health
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # FastAPI Backend - Serves the ML Model
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: dermaops-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=models/best_model_resnet.pth
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount model directory (optional, for development)
+      - ./models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - dermaops-network
+
+  # ==========================================================================
+  # Streamlit Frontend - User Interface
+  # ==========================================================================
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    container_name: dermaops-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000/predict
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - dermaops-network
+
+  # ==========================================================================
+  # Prefect Server (Optional) - Workflow Orchestration
+  # ==========================================================================
+  # Uncomment to include Prefect server in the stack
+  # prefect:
+  #   image: prefecthq/prefect:2-python3.10
+  #   container_name: dermaops-prefect
+  #   ports:
+  #     - "4200:4200"
+  #   command: prefect server start --host 0.0.0.0
+  #   restart: unless-stopped
+  #   networks:
+  #     - dermaops-network
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  dermaops-network:
+    driver: bridge
+    name: dermaops-network
+
+# ==========================================================================
+# Volumes (Optional - for persistent data)
+# ==========================================================================
+# volumes:
+#   model-data:
+#   prefect-data:
