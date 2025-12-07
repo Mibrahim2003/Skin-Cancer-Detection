@@ -77,9 +77,9 @@ venv.bak/
 
 # Data files (too large for git)
 data/raw/*
-data/processed/*
+# data/processed/*
 !data/raw/.gitkeep
-!data/processed/.gitkeep
+# !data/processed/.gitkeep
 
 # Model files (Handled by Git LFS)
 models/*.h5
@@ -101,9 +101,10 @@ Thumbs.db
 logs/
 
 # DermaOps Specific
-data/
+data/*
+!data/processed/
 !data/.gitkeep
-models/*.pth
+# models/*.pth  <-- Commented out to allow LFS tracking
 !models/.gitkeep
 venv/
 .env
