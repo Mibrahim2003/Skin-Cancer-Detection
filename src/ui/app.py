@@ -24,7 +24,7 @@ import pandas as pd
 
 # API URL Configuration
 # In Docker Compose, the API hostname is 'api'. Locally, it's 'localhost'.
-API_URL = os.environ.get("API_URL", "http://api:8000/predict")
+API_URL = os.environ.get("API_URL", "http://localhost:8000/predict")
 
 # For local development without Docker:
 # API_URL = "http://localhost:8000/predict"
@@ -108,19 +108,22 @@ st.markdown("""
         margin: 1rem 0;
     }
     .severity-warning {
-        background-color: #fff3e0;
+        background-color: #e65100;
         border-left: 5px solid #ff9800;
+        color: white;
     }
     .severity-danger {
-        background-color: #ffebee;
+        background-color: #b71c1c;
         border-left: 5px solid #f44336;
+        color: white;
     }
     .severity-safe {
-        background-color: #e8f5e9;
+        background-color: #1b5e20;
         border-left: 5px solid #4caf50;
+        color: white;
     }
     .disclaimer {
-        background-color: #e3f2fd;
+        background-color: #031b2d;
         padding: 1rem;
         border-radius: 5px;
         margin-top: 2rem;
@@ -195,13 +198,13 @@ with col1:
     if uploaded_file is not None:
         # Display uploaded image
         image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_container_width=True)
+        st.image(image, caption="Uploaded Image", width="stretch")
         
         # Image info
         st.caption(f"📁 File: {uploaded_file.name} | 📐 Size: {image.size[0]}x{image.size[1]}")
         
         # Analyze button
-        if st.button("🔬 Analyze Lesion", type="primary", use_container_width=True):
+        if st.button("🔬 Analyze Lesion", type="primary", width="stretch"):
             with st.spinner("🧠 Running inference on ResNet50 model..."):
                 try:
                     # Prepare image bytes for API
